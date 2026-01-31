@@ -113,6 +113,14 @@ function LatencyChart({ checks, height = 92 }) {
               </linearGradient>
             </defs>
 
+            {/* Y-axis labels */}
+            <text x={pad} y={pad + 2} fill="#737373" fontSize="10" textAnchor="start">
+              {max}ms
+            </text>
+            <text x={pad} y={height - pad} fill="#737373" fontSize="10" textAnchor="start" dominantBaseline="ideographic">
+              0ms
+            </text>
+
             {/* baseline */}
             <line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} stroke="#262626" strokeWidth="1" />
             <path d={d} fill="none" stroke="url(#latencyStroke)" strokeWidth="2" />
@@ -120,13 +128,8 @@ function LatencyChart({ checks, height = 92 }) {
         </div>
       )}
 
-      <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500">
-        <span>0ms</span>
-        <span>{max}ms</span>
-      </div>
-
       {pts.length >= 2 ? (
-        <div className="mt-1 flex items-center justify-between text-[11px] text-neutral-600">
+        <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-600">
           <span>{firstLabel}</span>
           <span>{midLabel}</span>
           <span>{lastLabel}</span>
