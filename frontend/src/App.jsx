@@ -128,11 +128,16 @@ function LatencyChart({ checks, height = 128 }) {
         <div className="mt-3 text-xs text-neutral-500">Not enough data yet.</div>
       ) : (
         <div className="mt-2 flex gap-3">
-          <div
-            className="flex w-5 items-center justify-center text-[10px] text-neutral-600"
-            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-          >
-            Resp. Time (ms)
+          {/* Y-axis labels (outside SVG so they don't stretch) */}
+          <div className="flex w-14 flex-col items-center justify-between text-[10px] text-neutral-500">
+            <div className="tabular-nums">{max}ms</div>
+            <div
+              className="text-neutral-600"
+              style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+            >
+              Resp. Time (ms)
+            </div>
+            <div className="tabular-nums">0ms</div>
           </div>
 
           <div className="min-w-0 flex-1">
@@ -146,14 +151,6 @@ function LatencyChart({ checks, height = 128 }) {
               {/* subtle grid */}
               <line x1={pad} y1={baseY} x2={width - pad} y2={baseY} stroke="#262626" strokeWidth="1" />
               <line x1={pad} y1={pad} x2={width - pad} y2={pad} stroke="#1f1f1f" strokeWidth="1" />
-
-              {/* Y-axis labels */}
-              <text x={pad} y={pad + 2} fill="#737373" fontSize="10" textAnchor="start">
-                {max}ms
-              </text>
-              <text x={pad} y={baseY} fill="#737373" fontSize="10" textAnchor="start" dominantBaseline="ideographic">
-                0ms
-              </text>
 
               {/* area + line segments */}
               {segments.map((s) => (
