@@ -1,0 +1,17 @@
+{
+  "name": "uptime-monitor-backend",
+  "version": "0.1.0",
+  "description": "Minimal uptime monitor backend (HTTP checks + red/green history)",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "better-sqlite3": "^12.6.2",
+    "fastify": "^5.7.2",
+    "zod": "^4.3.6"
+  }
+}
