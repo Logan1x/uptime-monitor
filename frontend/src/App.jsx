@@ -146,7 +146,15 @@ function LatencyChart({ checks, height = 128 }) {
             <text x={pad} y={baseY} fill="#737373" fontSize="10" textAnchor="start" dominantBaseline="ideographic">
               0ms
             </text>
-            <text x={pad} y={(pad + baseY) / 2} fill="#525252" fontSize="10" textAnchor="start" dominantBaseline="middle">
+            <text
+              x={pad}
+              y={(pad + baseY) / 2}
+              fill="#525252"
+              fontSize="10"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              transform={`rotate(-90 ${pad} ${(pad + baseY) / 2})`}
+            >
               Resp. Time (ms)
             </text>
 
