@@ -249,7 +249,7 @@ function MonitorStats({ checks }) {
 
 function LogsModal({ open, onClose, pm2Name }) {
   const [tab, setTab] = useState("out");
-  const [lines, setLines] = useState(200);
+  const [lines, setLines] = useState(1000);
   const [auto, setAuto] = useState(true);
   const [data, setData] = useState({ out: [], err: [] });
   const [loading, setLoading] = useState(false);
@@ -483,7 +483,7 @@ function LogsModal({ open, onClose, pm2Name }) {
                   const endpoint = r.method && r.url ? `${r.method} ${r.url}` : (r.url || "request");
                   const status = r.status;
                   const rt = r.responseTime;
-                  const rtMs = typeof rt === "number" ? `${rt.toFixed(0)}ms` : (rt != null ? `${rt}ms` : "—");
+                  const rtMs = typeof rt === "number" ? `${Math.round(rt)}ms` : (rt != null ? `${rt}ms` : "—");
 
                   const expanded = expandedKey === row.key;
 
