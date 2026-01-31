@@ -326,9 +326,70 @@ function LogsModal({ open, onClose, pm2Name }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, pm2Name, lines, auto]);
 
-  if (!open) return null;
-
   const active = tab === "out" ? data.out : data.err;
+
+  const rows = useMemo(() => {
+    const linesArr = Array.isArray(active) ? active : [];
+
+    // Merge fastify "incoming request" + "request completed" by reqId
+    const byReqId = new Map();
+    const order = [];
+
+    function ensure(id) {
+      if (!byReqId.has(id)) {
+        byReqId.set(id, { reqId: id, firstIndex: Infinity });
+        order.push(id);
+      }
+      return byReqId.get(id);
+    }
+
+    const out = [];
+
+    for (let i = 0; i < linesArr.length; i++) {
+      const raw = linesArr[i];
+      const obj = parseMaybeJson(raw);
+      const rid = obj?.reqId;
+
+      if (!obj || !rid) {
+        out.push({ kind: "raw", key: `${tab}:raw:${i}`, raw: String(raw) });
+        continue;
+      }
+
+      const row = ensure(rid);
+      row.firstIndex = Math.min(row.firstIndex, i);
+
+      if (obj.req) {
+        row.inTime = obj.time ?? row.inTime;
+        row.method = obj.req.method ?? row.method;
+        row.url = obj.req.url ?? row.url;
+      }
+
+      if (obj.res || obj.responseTime != null) {
+        row.doneTime = obj.time ?? row.doneTime;
+        row.status = obj.res?.statusCode ?? row.status;
+        row.responseTime = obj.responseTime ?? row.responseTime;
+      }
+
+      // keep latest messages (optional)
+      row.msg = obj.msg ?? row.msg;
+    }
+
+    // Build display rows in original-ish order, but one line per reqId
+    const merged = [];
+    const seen = new Set();
+    for (const id of order) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const r = byReqId.get(id);
+      if (!r) continue;
+      merged.push({ kind: "req", key: `${tab}:req:${id}`, req: r });
+    }
+
+    // Prefer merged rows; if there are lots of non-json lines, include them too.
+    return merged.length ? merged : out;
+  }, [active, tab]);
+
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={onClose}>
@@ -406,40 +467,32 @@ function LogsModal({ open, onClose, pm2Name }) {
           ) : null}
 
           <div className="h-[420px] overflow-auto rounded-xl border border-neutral-800 bg-black/30 p-2 text-[12px] leading-5 text-neutral-200">
-            {active?.length ? (
+            {rows?.length ? (
               <div className="grid gap-1">
-                {active.map((l, i) => {
-                  const obj = parseMaybeJson(l);
-                  const key = `${tab}:${i}`;
-
-                  if (!obj) {
+                {rows.map((row) => {
+                  if (row.kind === "raw") {
                     return (
-                      <div
-                        key={key}
-                        className="rounded-lg px-2 py-1 font-mono text-neutral-200"
-                      >
-                        <span className="text-neutral-500">•</span> {String(l)}
+                      <div key={row.key} className="rounded-lg px-2 py-1 font-mono text-neutral-200">
+                        <span className="text-neutral-500">•</span> {row.raw}
                       </div>
                     );
                   }
 
-                  const method = obj?.req?.method;
-                  const url = obj?.req?.url;
-                  const status = obj?.res?.statusCode;
-                  const rt = obj?.responseTime;
-                  const ts = obj?.time;
-                  const msg = obj?.msg;
-
-                  const endpoint = method && url ? `${method} ${url}` : (url || msg || "log");
+                  const r = row.req;
+                  const ts = r.inTime ?? r.doneTime;
+                  const endpoint = r.method && r.url ? `${r.method} ${r.url}` : (r.url || "request");
+                  const status = r.status;
+                  const rt = r.responseTime;
                   const rtMs = typeof rt === "number" ? `${rt.toFixed(0)}ms` : (rt != null ? `${rt}ms` : "—");
 
-                  const expanded = expandedKey === key;
+                  const expanded = expandedKey === row.key;
 
+                  // Minimal one-liner: time + method/url + rt + status
                   return (
-                    <div key={key} className="rounded-xl border border-neutral-900/60 bg-neutral-950/20">
+                    <div key={row.key} className="rounded-xl border border-neutral-900/60 bg-neutral-950/20">
                       <button
                         className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left"
-                        onClick={() => setExpandedKey(expanded ? "" : key)}
+                        onClick={() => setExpandedKey(expanded ? "" : row.key)}
                         title="Click to toggle raw JSON"
                       >
                         <div className="min-w-0">
@@ -447,7 +500,6 @@ function LogsModal({ open, onClose, pm2Name }) {
                             <span className="text-[11px] text-neutral-500 tabular-nums">{fmtTs(ts) || ""}</span>
                             <span className="truncate font-mono text-[12px] text-neutral-100">{endpoint}</span>
                           </div>
-                          <div className="mt-0.5 truncate text-[11px] text-neutral-500">{msg || ""}</div>
                         </div>
 
                         <div className="flex shrink-0 items-center gap-2">
@@ -470,7 +522,7 @@ function LogsModal({ open, onClose, pm2Name }) {
                           <pre
                             className="overflow-auto rounded-lg bg-black/40 p-2 font-mono text-[12px] leading-5 text-neutral-200"
                             dangerouslySetInnerHTML={{
-                              __html: jsonSyntaxHighlight(JSON.stringify(obj, null, 2))
+                              __html: jsonSyntaxHighlight(JSON.stringify(r, null, 2))
                             }}
                           />
                         </div>
