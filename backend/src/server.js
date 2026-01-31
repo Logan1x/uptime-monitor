@@ -171,19 +171,23 @@ async function main() {
     return reply.code(201).send({ id: info.lastInsertRowid });
   });
 
+  const updateUrl = db.prepare('UPDATE monitors SET url = ? WHERE id = ?');
+
   app.patch('/api/monitors/:id', async (req, reply) => {
     const id = Number(req.params.id);
     const m = getMonitor.get(id);
     if (!m) return reply.code(404).send({ error: 'not found' });
 
     const Body = z.object({
-      pm2Name: z.string().min(1).nullable().optional()
+      pm2Name: z.string().min(1).nullable().optional(),
+      url: z.string().url().nullable().optional()
     });
     const parsed = Body.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
-    const { pm2Name } = parsed.data;
-    updatePm2Name.run(pm2Name ?? null, id);
+    const { pm2Name, url } = parsed.data;
+    if (pm2Name !== undefined) updatePm2Name.run(pm2Name ?? null, id);
+    if (url !== undefined) updateUrl.run(url ?? null, id);
     return { ok: true };
   });
 
