@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, RefreshCw, Trash2, Terminal, X } from "lucide-react";
 import { addMonitor, deleteMonitor, getChecks, getPm2Logs, listMonitors } from "./api";
+import { Badge } from "@/components/ui/badge";
 
 function clsx(...xs) {
   return xs.filter(Boolean).join(" ");
@@ -527,17 +528,21 @@ function LogsModal({ open, onClose, pm2Name }) {
                             </div>
 
                             <div className="mt-1 flex flex-wrap items-center gap-2">
-                              <span
+                              <Badge
+                                variant="outline"
                                 className={clsx(
-                                  "rounded-md border px-2 py-0.5 text-[11px] font-medium tabular-nums",
+                                  "border px-2 py-0.5 text-[11px] font-medium tabular-nums",
                                   statusTone(status)
                                 )}
                               >
                                 {status ?? "—"}
-                              </span>
-                              <span className="rounded-md border border-neutral-800 bg-neutral-900 px-2 py-0.5 text-[11px] text-neutral-300 tabular-nums">
+                              </Badge>
+                              <Badge
+                                variant="outline"
+                                className="border border-neutral-800 bg-neutral-900 px-2 py-0.5 text-[11px] text-neutral-300 tabular-nums"
+                              >
                                 {rtMs}
-                              </span>
+                              </Badge>
                             </div>
                           </div>
                         </div>
