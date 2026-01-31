@@ -39,16 +39,27 @@ APP_ENV=prod CORS_ORIGIN=https://your-frontend-domain.com PORT=4070 node src/ser
 ```
 
 ### Frontend
-Set API base explicitly in prod:
+In prod, you have two options:
+
+**Option A (recommended): reverse proxy** so the frontend and backend share the same origin.
+- Serve the backend under `/api` on the same domain.
+- Then you can build the frontend without setting `VITE_API_BASE`.
+
+**Option B: separate API domain**
+- Set `VITE_API_BASE` to your backend base URL.
+
 ```bash
 cd frontend
 npm install
-# same-origin example
-VITE_API_BASE= npm run build
 
-# OR explicit api host example
+# Option A (same origin via proxy)
+npm run build
+
+# Option B (separate API domain)
 VITE_API_BASE=https://api.yourdomain.com npm run build
 ```
+
+If you see an error like “got HTML instead of JSON”, it usually means `/api/*` is not pointing to the backend.
 
 ## PM2 logs feature
 The logs viewer works by reading PM2 log files via the backend.

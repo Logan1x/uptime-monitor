@@ -4,7 +4,14 @@ function apiBase() {
   if (envBase) return envBase.replace(/\/$/, "");
 
   const mode = String(import.meta?.env?.MODE || "").toLowerCase();
-  if (mode === "production") return "";
+  if (mode === "production") {
+    // In prod we expect same-origin proxying (API served under /api) unless VITE_API_BASE is set.
+    try {
+      return window.location.origin;
+    } catch {
+      return "";
+    }
+  }
 
   try {
     return `http://${window.location.hostname}:4070`;
@@ -21,9 +28,33 @@ async function http(path, { method = 'GET', body } = {}) {
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined
   });
+
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!res.ok) throw new Error(data?.error ? JSON.stringify(data.error) : `HTTP ${res.status}`);
+
+  let data = null;
+  if (text) {
+    if (contentType.includes('application/json')) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // fall through; we'll throw a better error below
+      }
+    }
+  }
+
+  if (!res.ok) {
+    const detail = data?.error ? JSON.stringify(data.error) : (text ? text.slice(0, 200) : `HTTP ${res.status}`);
+    throw new Error(detail);
+  }
+
+  // If server returned HTML (common misconfig), surface a clear error.
+  if (text && !data && contentType.includes('text/html')) {
+    throw new Error(
+      'API misconfigured: got HTML instead of JSON. Set VITE_API_BASE to your backend (e.g. https://api.yourdomain.com) or proxy /api to the backend.'
+    );
+  }
+
   return data;
 }
 
