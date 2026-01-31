@@ -6,7 +6,8 @@ module.exports = {
       script: "src/server.js",
       interpreter: "node",
       env: {
-        NODE_ENV: "development"
+        NODE_ENV: "development",
+        APP_ENV: "dev"
       }
     },
     {
@@ -15,7 +16,8 @@ module.exports = {
       script: "node_modules/vite/bin/vite.js",
       args: "--host 0.0.0.0 --port 4071",
       env: {
-        NODE_ENV: "development"
+        NODE_ENV: "development",
+        APP_ENV: "dev"
       }
     }
   ]
