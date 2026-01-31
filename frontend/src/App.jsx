@@ -37,7 +37,7 @@ function HistoryDots({ checks }) {
   );
 }
 
-function LatencyChart({ checks, height = 84 }) {
+function LatencyChart({ checks, height = 92 }) {
   // checks come newest-first; we want oldest->newest for a left-to-right chart
   const pts = (checks || [])
     .slice(0, 60)
@@ -46,7 +46,7 @@ function LatencyChart({ checks, height = 84 }) {
     .reverse();
 
   const width = 560;
-  const pad = 8;
+  const pad = 10;
 
   const values = pts.map((c) => Number(c.latency_ms || 0));
   const max = Math.max(50, ...values);
@@ -72,12 +72,26 @@ function LatencyChart({ checks, height = 84 }) {
   const last = pts[pts.length - 1];
   const lastMs = last?.latency_ms;
 
+  const fmtTime = (iso) => {
+    try {
+      const d = new Date(iso);
+      // HH:MM in local time
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "";
+    }
+  };
+
+  const firstLabel = pts.length ? fmtTime(pts[0].ts) : "";
+  const midLabel = pts.length ? fmtTime(pts[Math.floor((pts.length - 1) / 2)].ts) : "";
+  const lastLabel = pts.length ? fmtTime(pts[pts.length - 1].ts) : "";
+
   return (
     <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3">
       <div className="flex items-baseline justify-between">
         <div>
           <div className="text-xs font-medium text-neutral-200">Response time</div>
-          <div className="text-[11px] text-neutral-500">Last {Math.min(pts.length, 60)} samples</div>
+          <div className="text-[11px] text-neutral-500">X-axis: timestamps (recent {Math.min(pts.length, 60)} checks)</div>
         </div>
         <div className="text-xs text-neutral-400">{lastMs != null ? `${lastMs}ms` : "—"}</div>
       </div>
@@ -88,7 +102,7 @@ function LatencyChart({ checks, height = 84 }) {
         <div className="mt-3 overflow-x-auto">
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="block h-[84px] min-w-[560px]"
+            className="block h-[92px] min-w-[560px]"
             role="img"
             aria-label="Response time line chart"
           >
@@ -110,6 +124,14 @@ function LatencyChart({ checks, height = 84 }) {
         <span>0ms</span>
         <span>{max}ms</span>
       </div>
+
+      {pts.length >= 2 ? (
+        <div className="mt-1 flex items-center justify-between text-[11px] text-neutral-600">
+          <span>{firstLabel}</span>
+          <span>{midLabel}</span>
+          <span>{lastLabel}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
