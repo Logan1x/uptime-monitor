@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, RefreshCw, Trash2, Terminal, X } from "lucide-react";
-import { addMonitor, deleteMonitor, getChecks, getPm2Logs, listMonitors } from "./api";
+import { addMonitor, deleteMonitor, getCapabilities, getChecks, getPm2Logs, listMonitors } from "./api";
 import { Badge } from "@/components/ui/badge";
 
 function clsx(...xs) {
@@ -248,7 +248,7 @@ function MonitorStats({ checks }) {
   );
 }
 
-function LogsModal({ open, onClose, pm2Name }) {
+function LogsModal({ open, onClose, pm2Name, enabled }) {
   const [tab, setTab] = useState("out");
   const [lines, setLines] = useState(200);
   const [auto, setAuto] = useState(true);
@@ -415,6 +415,7 @@ function LogsModal({ open, onClose, pm2Name }) {
   }, [open, auto, tab, rows.length]);
 
   if (!open) return null;
+  if (!enabled) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={onClose}>
@@ -583,6 +584,7 @@ export default function App() {
 
   const [logsOpen, setLogsOpen] = useState(false);
   const [logsPm2Name, setLogsPm2Name] = useState("");
+  const [caps, setCaps] = useState({ pm2Logs: false });
 
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState("");
@@ -604,6 +606,10 @@ export default function App() {
 
   useEffect(() => {
     refresh();
+    getCapabilities()
+      .then((c) => setCaps({ pm2Logs: !!c?.pm2Logs }))
+      .catch(() => setCaps({ pm2Logs: false }));
+
     const t = setInterval(refresh, 5000);
     return () => clearInterval(t);
   }, []);
@@ -659,7 +665,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
-      <LogsModal open={logsOpen} onClose={() => setLogsOpen(false)} pm2Name={logsPm2Name} />
+      <LogsModal open={logsOpen} onClose={() => setLogsOpen(false)} pm2Name={logsPm2Name} enabled={caps.pm2Logs} />
 
       {/* Add Monitor Modal */}
       {addOpen ? (
@@ -721,6 +727,12 @@ export default function App() {
                   onChange={(e) => setIntervalSec(e.target.value)}
                 />
               </div>
+
+              {!caps.pm2Logs ? (
+                <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 px-3 py-2 text-xs text-neutral-300">
+                  PM2 logs aren’t available in this hosted mode. Self-host to enable PM2 log viewing.
+                </div>
+              ) : null}
 
               {err ? (
                 <div className="rounded-lg border border-rose-900/40 bg-rose-950/30 px-3 py-2 text-sm text-rose-200">
@@ -821,7 +833,7 @@ export default function App() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        {m.pm2_name ? (
+                        {caps.pm2Logs && m.pm2_name ? (
                           <div
                             role="button"
                             tabIndex={0}

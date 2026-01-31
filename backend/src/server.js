@@ -6,8 +6,12 @@ const Database = require('better-sqlite3');
 const pm2 = require('pm2');
 const { z } = require('zod');
 
-const PORT = 4070;
+const PORT = Number(process.env.PORT || 4070);
 const DB_PATH = path.join(process.cwd(), 'data', 'uptime.db');
+
+const APP_ENV = String(process.env.APP_ENV || process.env.UPTIME_ENV || '').toLowerCase();
+const NODE_ENV = String(process.env.NODE_ENV || '').toLowerCase();
+const IS_PROD = APP_ENV === 'prod' || NODE_ENV === 'production';
 
 function ensureDb() {
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
@@ -87,7 +91,7 @@ async function checkUrl(url) {
 async function main() {
   const app = Fastify({ logger: true });
   await app.register(cors, {
-    origin: true,
+    origin: IS_PROD ? (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean) : false) : true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type']
   });
@@ -129,7 +133,11 @@ async function main() {
     schedulerTick().catch((e) => app.log.error(e));
   }, 1000);
 
-  app.get('/health', async () => ({ ok: true }));
+  app.get('/health', async () => ({ ok: true, env: IS_PROD ? 'prod' : 'dev' }));
+
+  app.get('/api/capabilities', async () => ({
+    pm2Logs: !IS_PROD
+  }));
 
   app.get('/api/monitors', async () => {
     const mons = listMonitors.all();
@@ -167,7 +175,8 @@ async function main() {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
     const { name, url, intervalSec, pm2Name } = parsed.data;
-    const info = insertMonitor.run(name, url, intervalSec || 60, 1, pm2Name || null, nowIso());
+    const safePm2Name = IS_PROD ? null : (pm2Name || null);
+    const info = insertMonitor.run(name, url, intervalSec || 60, 1, safePm2Name, nowIso());
     return reply.code(201).send({ id: info.lastInsertRowid });
   });
 
@@ -186,7 +195,10 @@ async function main() {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
     const { pm2Name, url } = parsed.data;
-    if (pm2Name !== undefined) updatePm2Name.run(pm2Name ?? null, id);
+    if (pm2Name !== undefined) {
+      if (IS_PROD) return reply.code(403).send({ error: 'pm2 logs are disabled in prod' });
+      updatePm2Name.run(pm2Name ?? null, id);
+    }
     if (url !== undefined) updateUrl.run(url ?? null, id);
     return { ok: true };
   });
@@ -230,6 +242,7 @@ async function main() {
   }
 
   app.get('/api/pm2/apps', async (req, reply) => {
+    if (IS_PROD) return reply.code(404).send({ error: 'not found' });
     try {
       await pm2Connect();
       const list = await pm2List();
@@ -251,6 +264,8 @@ async function main() {
   });
 
   app.get('/api/pm2/apps/:name/logs', async (req, reply) => {
+    if (IS_PROD) return reply.code(404).send({ error: 'not found' });
+
     const name = String(req.params.name);
     const lines = Math.min(Number(req.query.lines || 200), 2000);
 
