@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const Fastify = require('fastify');
 const cors = require('@fastify/cors');
 const Database = require('better-sqlite3');
+const pm2 = require('pm2');
 const { z } = require('zod');
 
 const PORT = 4070;
@@ -19,6 +20,7 @@ function ensureDb() {
       url TEXT NOT NULL,
       interval_sec INTEGER NOT NULL DEFAULT 60,
       enabled INTEGER NOT NULL DEFAULT 1,
+      pm2_name TEXT,
       created_at TEXT NOT NULL
     );
 
@@ -35,6 +37,14 @@ function ensureDb() {
 
     CREATE INDEX IF NOT EXISTS idx_checks_monitor_ts ON checks(monitor_id, ts);
   `);
+
+  // lightweight migration for older DBs
+  try {
+    db.exec('ALTER TABLE monitors ADD COLUMN pm2_name TEXT');
+  } catch {
+    // ignore if it already exists
+  }
+
   return db;
 }
 
@@ -78,7 +88,7 @@ async function main() {
   const app = Fastify({ logger: true });
   await app.register(cors, {
     origin: true,
-    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type']
   });
 
@@ -86,7 +96,8 @@ async function main() {
 
   const listMonitors = db.prepare('SELECT * FROM monitors ORDER BY created_at DESC');
   const getMonitor = db.prepare('SELECT * FROM monitors WHERE id = ?');
-  const insertMonitor = db.prepare('INSERT INTO monitors(name,url,interval_sec,enabled,created_at) VALUES(?,?,?,?,?)');
+  const insertMonitor = db.prepare('INSERT INTO monitors(name,url,interval_sec,enabled,pm2_name,created_at) VALUES(?,?,?,?,?,?)');
+  const updatePm2Name = db.prepare('UPDATE monitors SET pm2_name = ? WHERE id = ?');
   const deleteMonitor = db.prepare('DELETE FROM monitors WHERE id = ?');
 
   const insertCheck = db.prepare('INSERT INTO checks(monitor_id,ts,ok,status_code,latency_ms,error) VALUES(?,?,?,?,?,?)');
@@ -149,14 +160,112 @@ async function main() {
     const Body = z.object({
       name: z.string().min(1),
       url: z.string().url(),
-      intervalSec: z.number().int().min(10).max(3600).optional()
+      intervalSec: z.number().int().min(10).max(3600).optional(),
+      pm2Name: z.string().min(1).optional()
     });
     const parsed = Body.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
-    const { name, url, intervalSec } = parsed.data;
-    const info = insertMonitor.run(name, url, intervalSec || 60, 1, nowIso());
+    const { name, url, intervalSec, pm2Name } = parsed.data;
+    const info = insertMonitor.run(name, url, intervalSec || 60, 1, pm2Name || null, nowIso());
     return reply.code(201).send({ id: info.lastInsertRowid });
+  });
+
+  app.patch('/api/monitors/:id', async (req, reply) => {
+    const id = Number(req.params.id);
+    const m = getMonitor.get(id);
+    if (!m) return reply.code(404).send({ error: 'not found' });
+
+    const Body = z.object({
+      pm2Name: z.string().min(1).nullable().optional()
+    });
+    const parsed = Body.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const { pm2Name } = parsed.data;
+    updatePm2Name.run(pm2Name ?? null, id);
+    return { ok: true };
+  });
+
+  function pm2Connect() {
+    return new Promise((resolve, reject) => {
+      pm2.connect((err) => (err ? reject(err) : resolve()));
+    });
+  }
+
+  function pm2Disconnect() {
+    try {
+      pm2.disconnect();
+    } catch {
+      // ignore
+    }
+  }
+
+  function pm2List() {
+    return new Promise((resolve, reject) => {
+      pm2.list((err, list) => (err ? reject(err) : resolve(list || [])));
+    });
+  }
+
+  function pm2Describe(name) {
+    return new Promise((resolve, reject) => {
+      pm2.describe(name, (err, desc) => (err ? reject(err) : resolve(desc || [])));
+    });
+  }
+
+  function tailFileLines(filePath, lines = 200) {
+    try {
+      if (!filePath) return [];
+      if (!fs.existsSync(filePath)) return [];
+      const txt = fs.readFileSync(filePath, 'utf8');
+      const xs = txt.split(/\r?\n/).filter(Boolean);
+      return xs.slice(-lines);
+    } catch {
+      return [];
+    }
+  }
+
+  app.get('/api/pm2/apps', async (req, reply) => {
+    try {
+      await pm2Connect();
+      const list = await pm2List();
+      return {
+        apps: list.map((p) => ({
+          name: p?.name,
+          pid: p?.pid,
+          status: p?.pm2_env?.status,
+          restartTime: p?.pm2_env?.restart_time,
+          cpu: p?.monit?.cpu,
+          mem: p?.monit?.memory
+        }))
+      };
+    } catch (e) {
+      return reply.code(500).send({ error: e?.message || String(e) });
+    } finally {
+      pm2Disconnect();
+    }
+  });
+
+  app.get('/api/pm2/apps/:name/logs', async (req, reply) => {
+    const name = String(req.params.name);
+    const lines = Math.min(Number(req.query.lines || 200), 2000);
+
+    try {
+      await pm2Connect();
+      const desc = await pm2Describe(name);
+      const env = desc?.[0]?.pm2_env;
+      const outPath = env?.pm_out_log_path;
+      const errPath = env?.pm_err_log_path;
+      return {
+        name,
+        out: tailFileLines(outPath, lines),
+        err: tailFileLines(errPath, lines)
+      };
+    } catch (e) {
+      return reply.code(500).send({ error: e?.message || String(e) });
+    } finally {
+      pm2Disconnect();
+    }
   });
 
   app.delete('/api/monitors/:id', async (req, reply) => {

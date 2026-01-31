@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, Trash2 } from "lucide-react";
-import { addMonitor, deleteMonitor, getChecks, listMonitors } from "./api";
+import { Plus, RefreshCw, Trash2, Terminal, X } from "lucide-react";
+import { addMonitor, deleteMonitor, getChecks, getPm2Logs, listMonitors } from "./api";
 
 function clsx(...xs) {
   return xs.filter(Boolean).join(" ");
@@ -244,12 +244,144 @@ function MonitorStats({ checks }) {
   );
 }
 
+function LogsModal({ open, onClose, pm2Name }) {
+  const [tab, setTab] = useState("out");
+  const [lines, setLines] = useState(200);
+  const [auto, setAuto] = useState(true);
+  const [data, setData] = useState({ out: [], err: [] });
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function refresh() {
+    if (!pm2Name) return;
+    setLoading(true);
+    setErr("");
+    try {
+      const d = await getPm2Logs(pm2Name, lines);
+      setData({ out: d.out || [], err: d.err || [] });
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    refresh();
+    if (!auto) return;
+    const t = setInterval(refresh, 2000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pm2Name, lines, auto]);
+
+  if (!open) return null;
+
+  const active = tab === "out" ? data.out : data.err;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={onClose}>
+      <div
+        className="w-full max-w-3xl rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-neutral-100">Logs</div>
+            <div className="truncate text-xs text-neutral-500">pm2: {pm2Name}</div>
+          </div>
+          <button
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800"
+            onClick={onClose}
+            title="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="grid gap-3 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="inline-flex rounded-lg border border-neutral-800 bg-neutral-900 p-1 text-xs">
+              <button
+                className={clsx(
+                  "rounded-md px-3 py-1",
+                  tab === "out" ? "bg-neutral-800 text-neutral-100" : "text-neutral-400 hover:text-neutral-200"
+                )}
+                onClick={() => setTab("out")}
+              >
+                stdout
+              </button>
+              <button
+                className={clsx(
+                  "rounded-md px-3 py-1",
+                  tab === "err" ? "bg-neutral-800 text-neutral-100" : "text-neutral-400 hover:text-neutral-200"
+                )}
+                onClick={() => setTab("err")}
+              >
+                stderr
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs text-neutral-400">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+                Auto
+              </label>
+              <label className="flex items-center gap-2">
+                Lines
+                <input
+                  type="number"
+                  min={50}
+                  max={2000}
+                  value={lines}
+                  onChange={(e) => setLines(Number(e.target.value || 200))}
+                  className="w-24 rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
+                />
+              </label>
+              <button
+                className="rounded-md border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
+                onClick={refresh}
+                disabled={loading}
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {err ? (
+            <div className="rounded-lg border border-rose-900/40 bg-rose-950/30 px-3 py-2 text-xs text-rose-200">
+              {err}
+            </div>
+          ) : null}
+
+          <div className="h-[420px] overflow-auto rounded-xl border border-neutral-800 bg-black/30 p-3 font-mono text-[12px] leading-5 text-neutral-200">
+            {active?.length ? (
+              active.map((l, i) => (
+                <div key={i} className="whitespace-pre-wrap break-words">
+                  {l}
+                </div>
+              ))
+            ) : (
+              <div className="text-neutral-500">No logs.</div>
+            )}
+          </div>
+
+          <div className="text-[11px] text-neutral-600">Tip: add pm2Name to a monitor to enable this button.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [monitors, setMonitors] = useState([]);
   const [selected, setSelected] = useState(null);
   const [checks, setChecks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [logsPm2Name, setLogsPm2Name] = useState("");
 
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
@@ -325,6 +457,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
+      <LogsModal
+        open={logsOpen}
+        onClose={() => setLogsOpen(false)}
+        pm2Name={logsPm2Name}
+      />
       <div className="mx-auto max-w-6xl px-4 py-6">
         <header className="flex items-end justify-between gap-4">
           <div>
@@ -436,18 +573,37 @@ export default function App() {
                           ) : null}
                         </div>
                       </div>
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onDelete(m.id);
-                        }}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-neutral-400 hover:border-rose-900/40 hover:bg-rose-950/30 hover:text-rose-300"
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
+                      <div className="flex items-center gap-1">
+                        {m.pm2_name ? (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setLogsPm2Name(m.pm2_name);
+                              setLogsOpen(true);
+                            }}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-neutral-400 hover:border-neutral-700 hover:bg-neutral-900 hover:text-neutral-200"
+                            title="Logs (pm2)"
+                          >
+                            <Terminal size={16} />
+                          </div>
+                        ) : null}
+
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onDelete(m.id);
+                          }}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-neutral-400 hover:border-rose-900/40 hover:bg-rose-950/30 hover:text-rose-300"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </div>
                       </div>
                     </div>
                   </button>

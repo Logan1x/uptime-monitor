@@ -24,8 +24,16 @@ export function listMonitors() {
   return http('/api/monitors');
 }
 
-export function addMonitor({ name, url, intervalSec }) {
-  return http('/api/monitors', { method: 'POST', body: { name, url, intervalSec } });
+export function addMonitor({ name, url, intervalSec, pm2Name }) {
+  return http('/api/monitors', { method: 'POST', body: { name, url, intervalSec, pm2Name } });
+}
+
+export function patchMonitor(id, patch) {
+  return http(`/api/monitors/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch });
+}
+
+export function getPm2Logs(name, lines = 200) {
+  return http(`/api/pm2/apps/${encodeURIComponent(name)}/logs?lines=${encodeURIComponent(lines)}`);
 }
 
 export function deleteMonitor(id) {
