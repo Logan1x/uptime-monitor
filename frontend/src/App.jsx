@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, RefreshCw, Trash2, Terminal, X } from "lucide-react";
 import { addMonitor, deleteMonitor, getChecks, getPm2Logs, listMonitors } from "./api";
 
@@ -255,6 +255,7 @@ function LogsModal({ open, onClose, pm2Name }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [expandedKey, setExpandedKey] = useState("");
+  const scrollRef = useRef(null);
 
   function parseMaybeJson(line) {
     try {
@@ -389,6 +390,22 @@ function LogsModal({ open, onClose, pm2Name }) {
     return merged.length ? merged : out;
   }, [active, tab]);
 
+  useEffect(() => {
+    if (!open) return;
+    if (!auto) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    // next tick so the DOM has rendered
+    const t = setTimeout(() => {
+      try {
+        el.scrollTop = el.scrollHeight;
+      } catch {
+        // ignore
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [open, auto, tab, rows.length]);
+
   if (!open) return null;
 
   return (
@@ -466,7 +483,7 @@ function LogsModal({ open, onClose, pm2Name }) {
             </div>
           ) : null}
 
-          <div className="h-[420px] overflow-auto rounded-xl border border-neutral-800 bg-black/30 p-2 text-[12px] leading-5 text-neutral-200">
+          <div ref={scrollRef} className="h-[420px] overflow-auto rounded-xl border border-neutral-800 bg-black/30 p-2 text-[12px] leading-5 text-neutral-200">
             {rows?.length ? (
               <div className="grid gap-1">
                 {rows.map((row) => {
