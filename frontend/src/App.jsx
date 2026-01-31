@@ -127,54 +127,52 @@ function LatencyChart({ checks, height = 128 }) {
       {pts.length < 2 ? (
         <div className="mt-3 text-xs text-neutral-500">Not enough data yet.</div>
       ) : (
-        <div className="mt-2">
-          <svg
-            viewBox={`0 0 ${width} ${height}`}
-            className="block h-[140px] w-full"
-            preserveAspectRatio="none"
-            role="img"
-            aria-label="Response time chart"
+        <div className="mt-2 flex gap-3">
+          <div
+            className="flex w-5 items-center justify-center text-[10px] text-neutral-600"
+            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
           >
-            {/* subtle grid */}
-            <line x1={pad} y1={baseY} x2={width - pad} y2={baseY} stroke="#262626" strokeWidth="1" />
-            <line x1={pad} y1={pad} x2={width - pad} y2={pad} stroke="#1f1f1f" strokeWidth="1" />
+            Resp. Time (ms)
+          </div>
 
-            {/* Y-axis labels */}
-            <text x={pad} y={pad + 2} fill="#737373" fontSize="10" textAnchor="start">
-              {max}ms
-            </text>
-            <text x={pad} y={baseY} fill="#737373" fontSize="10" textAnchor="start" dominantBaseline="ideographic">
-              0ms
-            </text>
-            <text
-              x={pad}
-              y={(pad + baseY) / 2}
-              fill="#525252"
-              fontSize="10"
-              textAnchor="middle"
-              dominantBaseline="middle"
-              transform={`rotate(-90 ${pad} ${(pad + baseY) / 2})`}
+          <div className="min-w-0 flex-1">
+            <svg
+              viewBox={`0 0 ${width} ${height}`}
+              className="block h-[140px] w-full"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label="Response time chart"
             >
-              Resp. Time (ms)
-            </text>
+              {/* subtle grid */}
+              <line x1={pad} y1={baseY} x2={width - pad} y2={baseY} stroke="#262626" strokeWidth="1" />
+              <line x1={pad} y1={pad} x2={width - pad} y2={pad} stroke="#1f1f1f" strokeWidth="1" />
 
-            {/* area + line segments */}
-            {segments.map((s) => (
-              <g key={`${s.ok ? "up" : "down"}-${s.start}-${s.end}`}> 
-                <path
-                  d={areaPathForRange(s.start, s.end)}
-                  fill={s.ok ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)"}
-                  stroke="none"
-                />
-                <path
-                  d={linePathForRange(s.start, s.end)}
-                  fill="none"
-                  stroke={s.ok ? "#22c55e" : "#ef4444"}
-                  strokeWidth="2"
-                />
-              </g>
-            ))}
-          </svg>
+              {/* Y-axis labels */}
+              <text x={pad} y={pad + 2} fill="#737373" fontSize="10" textAnchor="start">
+                {max}ms
+              </text>
+              <text x={pad} y={baseY} fill="#737373" fontSize="10" textAnchor="start" dominantBaseline="ideographic">
+                0ms
+              </text>
+
+              {/* area + line segments */}
+              {segments.map((s) => (
+                <g key={`${s.ok ? "up" : "down"}-${s.start}-${s.end}`}> 
+                  <path
+                    d={areaPathForRange(s.start, s.end)}
+                    fill={s.ok ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)"}
+                    stroke="none"
+                  />
+                  <path
+                    d={linePathForRange(s.start, s.end)}
+                    fill="none"
+                    stroke={s.ok ? "#22c55e" : "#ef4444"}
+                    strokeWidth="2"
+                  />
+                </g>
+              ))}
+            </svg>
+          </div>
         </div>
       )}
 
