@@ -29,10 +29,87 @@ function HistoryDots({ checks }) {
             "h-2.5 w-2.5 rounded-sm",
             c.ok ? "bg-emerald-500/80" : "bg-rose-500/80"
           )}
-          title={`${c.ts} • ${c.ok ? "UP" : "DOWN"}${c.status_code ? ` • ${c.status_code}` : ""}`}
+          title={`${c.ts} • ${c.ok ? "UP" : "DOWN"}${c.status_code ? ` • ${c.status_code}` : ""}${c.latency_ms != null ? ` • ${c.latency_ms}ms` : ""}`}
         />
       ))}
       {!dots.length ? <span className="text-xs text-neutral-500">No checks yet</span> : null}
+    </div>
+  );
+}
+
+function LatencyChart({ checks, height = 84 }) {
+  // checks come newest-first; we want oldest->newest for a left-to-right chart
+  const pts = (checks || [])
+    .slice(0, 60)
+    .filter((c) => c.latency_ms != null)
+    .slice()
+    .reverse();
+
+  const width = 560;
+  const pad = 8;
+
+  const values = pts.map((c) => Number(c.latency_ms || 0));
+  const max = Math.max(50, ...values);
+  const min = 0;
+
+  const toX = (i) => {
+    if (pts.length <= 1) return pad;
+    return pad + (i * (width - pad * 2)) / (pts.length - 1);
+  };
+  const toY = (v) => {
+    const t = (v - min) / (max - min);
+    return pad + (1 - t) * (height - pad * 2);
+  };
+
+  const d = pts
+    .map((c, i) => {
+      const x = toX(i);
+      const y = toY(Number(c.latency_ms || 0));
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
+
+  const last = pts[pts.length - 1];
+  const lastMs = last?.latency_ms;
+
+  return (
+    <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3">
+      <div className="flex items-baseline justify-between">
+        <div>
+          <div className="text-xs font-medium text-neutral-200">Response time</div>
+          <div className="text-[11px] text-neutral-500">Last {Math.min(pts.length, 60)} samples</div>
+        </div>
+        <div className="text-xs text-neutral-400">{lastMs != null ? `${lastMs}ms` : "—"}</div>
+      </div>
+
+      {pts.length < 2 ? (
+        <div className="mt-3 text-xs text-neutral-500">Not enough data yet.</div>
+      ) : (
+        <div className="mt-3 overflow-x-auto">
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="block h-[84px] min-w-[560px]"
+            role="img"
+            aria-label="Response time line chart"
+          >
+            <defs>
+              <linearGradient id="latencyStroke" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#34d399" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.9" />
+              </linearGradient>
+            </defs>
+
+            {/* baseline */}
+            <line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} stroke="#262626" strokeWidth="1" />
+            <path d={d} fill="none" stroke="url(#latencyStroke)" strokeWidth="2" />
+          </svg>
+        </div>
+      )}
+
+      <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500">
+        <span>0ms</span>
+        <span>{max}ms</span>
+      </div>
     </div>
   );
 }
@@ -255,16 +332,20 @@ export default function App() {
             </div>
 
             {selectedMonitor ? (
-              <div className="mt-4 rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium">{selectedMonitor.name}</div>
-                    <div className="text-xs text-neutral-500">Recent checks</div>
+              <div className="mt-4 space-y-3">
+                <LatencyChart checks={checks} />
+
+                <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium">{selectedMonitor.name}</div>
+                      <div className="text-xs text-neutral-500">Recent checks</div>
+                    </div>
+                    <div className="text-xs text-neutral-500">Last 30</div>
                   </div>
-                  <div className="text-xs text-neutral-500">Last 30</div>
-                </div>
-                <div className="mt-3">
-                  <HistoryDots checks={checks} />
+                  <div className="mt-3">
+                    <HistoryDots checks={checks} />
+                  </div>
                 </div>
               </div>
             ) : null}
