@@ -99,10 +99,11 @@ function LatencyChart({ checks, height = 92 }) {
       {pts.length < 2 ? (
         <div className="mt-3 text-xs text-neutral-500">Not enough data yet.</div>
       ) : (
-        <div className="mt-3 overflow-x-auto">
+        <div className="mt-3">
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="block h-[92px] min-w-[560px]"
+            className="block h-[92px] w-full"
+            preserveAspectRatio="none"
             role="img"
             aria-label="Response time line chart"
           >
