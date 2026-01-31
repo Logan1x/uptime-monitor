@@ -61,13 +61,27 @@ function LatencyChart({ checks, height = 92 }) {
     return pad + (1 - t) * (height - pad * 2);
   };
 
-  const d = pts
-    .map((c, i) => {
-      const x = toX(i);
-      const y = toY(Number(c.latency_ms || 0));
-      return `${i === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(" ");
+  const segments = [];
+  for (let i = 0; i < pts.length; i++) {
+    const ok = pts[i].ok === 1;
+    const last = segments[segments.length - 1];
+    if (!last || last.ok !== ok) segments.push({ ok, start: i, end: i });
+    else last.end = i;
+  }
+
+  function pathForRange(a, b) {
+    // Include one-point overlap with previous segment so the line looks continuous.
+    const start = Math.max(0, a - 1);
+    return pts
+      .slice(start, b + 1)
+      .map((c, idx) => {
+        const i = start + idx;
+        const x = toX(i);
+        const y = toY(Number(c.latency_ms || 0));
+        return `${idx === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+      })
+      .join(" ");
+  }
 
   const last = pts[pts.length - 1];
   const lastMs = last?.latency_ms;
@@ -107,12 +121,7 @@ function LatencyChart({ checks, height = 92 }) {
             role="img"
             aria-label="Response time line chart"
           >
-            <defs>
-              <linearGradient id="latencyStroke" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#34d399" stopOpacity="0.9" />
-                <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.9" />
-              </linearGradient>
-            </defs>
+            {/* solid stroke */}
 
             {/* Y-axis labels */}
             <text x={pad} y={pad + 2} fill="#737373" fontSize="10" textAnchor="start">
@@ -124,7 +133,15 @@ function LatencyChart({ checks, height = 92 }) {
 
             {/* baseline */}
             <line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} stroke="#262626" strokeWidth="1" />
-            <path d={d} fill="none" stroke="url(#latencyStroke)" strokeWidth="2" />
+            {segments.map((s) => (
+              <path
+                key={`${s.ok ? "up" : "down"}-${s.start}-${s.end}`}
+                d={pathForRange(s.start, s.end)}
+                fill="none"
+                stroke={s.ok ? "#22c55e" : "#ef4444"}
+                strokeWidth="2"
+              />
+            ))}
           </svg>
         </div>
       )}
