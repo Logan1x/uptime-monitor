@@ -254,6 +254,53 @@ function LogsModal({ open, onClose, pm2Name }) {
   const [data, setData] = useState({ out: [], err: [] });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [expandedKey, setExpandedKey] = useState("");
+
+  function parseMaybeJson(line) {
+    try {
+      const s = String(line || "").trim();
+      if (!s) return null;
+      if (s[0] !== "{" && s[0] !== "[") return null;
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
+  }
+
+  function fmtTs(msOrIso) {
+    try {
+      // fastify logger uses epoch ms in "time"
+      const d = typeof msOrIso === "number" ? new Date(msOrIso) : new Date(msOrIso);
+      if (Number.isNaN(d.getTime())) return "";
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    } catch {
+      return "";
+    }
+  }
+
+  function statusTone(code) {
+    if (code == null) return "bg-neutral-800/50 text-neutral-300 border-neutral-700";
+    if (code >= 200 && code < 400) return "bg-emerald-500/15 text-emerald-200 border-emerald-500/30";
+    if (code >= 400 && code < 500) return "bg-amber-500/15 text-amber-200 border-amber-500/30";
+    return "bg-rose-500/15 text-rose-200 border-rose-500/30";
+  }
+
+  function jsonSyntaxHighlight(json) {
+    const esc = json
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    return esc.replace(
+      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"\s*:)|("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?/g,
+      (m, key, _a, str, _b, boolNull) => {
+        if (key) return `<span class="text-amber-200">${m}</span>`;
+        if (str) return `<span class="text-emerald-200">${m}</span>`;
+        if (boolNull) return `<span class="text-fuchsia-200">${m}</span>`;
+        return `<span class="text-sky-200">${m}</span>`;
+      }
+    );
+  }
 
   async function refresh() {
     if (!pm2Name) return;
@@ -271,6 +318,7 @@ function LogsModal({ open, onClose, pm2Name }) {
 
   useEffect(() => {
     if (!open) return;
+    setExpandedKey("");
     refresh();
     if (!auto) return;
     const t = setInterval(refresh, 2000);
@@ -357,15 +405,82 @@ function LogsModal({ open, onClose, pm2Name }) {
             </div>
           ) : null}
 
-          <div className="h-[420px] overflow-auto rounded-xl border border-neutral-800 bg-black/30 p-3 font-mono text-[12px] leading-5 text-neutral-200">
+          <div className="h-[420px] overflow-auto rounded-xl border border-neutral-800 bg-black/30 p-2 text-[12px] leading-5 text-neutral-200">
             {active?.length ? (
-              active.map((l, i) => (
-                <div key={i} className="whitespace-pre-wrap break-words">
-                  {l}
-                </div>
-              ))
+              <div className="grid gap-1">
+                {active.map((l, i) => {
+                  const obj = parseMaybeJson(l);
+                  const key = `${tab}:${i}`;
+
+                  if (!obj) {
+                    return (
+                      <div
+                        key={key}
+                        className="rounded-lg px-2 py-1 font-mono text-neutral-200"
+                      >
+                        <span className="text-neutral-500">•</span> {String(l)}
+                      </div>
+                    );
+                  }
+
+                  const method = obj?.req?.method;
+                  const url = obj?.req?.url;
+                  const status = obj?.res?.statusCode;
+                  const rt = obj?.responseTime;
+                  const ts = obj?.time;
+                  const msg = obj?.msg;
+
+                  const endpoint = method && url ? `${method} ${url}` : (url || msg || "log");
+                  const rtMs = typeof rt === "number" ? `${rt.toFixed(0)}ms` : (rt != null ? `${rt}ms` : "—");
+
+                  const expanded = expandedKey === key;
+
+                  return (
+                    <div key={key} className="rounded-xl border border-neutral-900/60 bg-neutral-950/20">
+                      <button
+                        className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left"
+                        onClick={() => setExpandedKey(expanded ? "" : key)}
+                        title="Click to toggle raw JSON"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-neutral-500 tabular-nums">{fmtTs(ts) || ""}</span>
+                            <span className="truncate font-mono text-[12px] text-neutral-100">{endpoint}</span>
+                          </div>
+                          <div className="mt-0.5 truncate text-[11px] text-neutral-500">{msg || ""}</div>
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="rounded-md border border-neutral-800 bg-neutral-900 px-2 py-0.5 text-[11px] text-neutral-300 tabular-nums">
+                            {rtMs}
+                          </span>
+                          <span
+                            className={clsx(
+                              "rounded-md border px-2 py-0.5 text-[11px] font-medium tabular-nums",
+                              statusTone(status)
+                            )}
+                          >
+                            {status ?? "—"}
+                          </span>
+                        </div>
+                      </button>
+
+                      {expanded ? (
+                        <div className="border-t border-neutral-900/60 px-3 py-2">
+                          <pre
+                            className="overflow-auto rounded-lg bg-black/40 p-2 font-mono text-[12px] leading-5 text-neutral-200"
+                            dangerouslySetInnerHTML={{
+                              __html: jsonSyntaxHighlight(JSON.stringify(obj, null, 2))
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
-              <div className="text-neutral-500">No logs.</div>
+              <div className="px-2 py-3 text-neutral-500">No logs.</div>
             )}
           </div>
 
