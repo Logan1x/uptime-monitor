@@ -6,18 +6,17 @@ import { cva } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
+  // NOTE: we keep the "important" base from shadcn, but map tokens to our Tailwind palette.
+  "inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none transition-[color,box-shadow] overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
-        secondary: "bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
-        destructive:
-          "bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
-        outline:
-          "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-        ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 [a&]:hover:underline",
+        default: "bg-emerald-500/15 text-emerald-200 border-emerald-500/30",
+        secondary: "bg-neutral-900 text-neutral-100 border-neutral-700",
+        destructive: "bg-rose-500/15 text-rose-200 border-rose-500/30",
+        outline: "bg-transparent border-neutral-700 text-neutral-200",
+        ghost: "bg-transparent border-transparent text-neutral-200 hover:bg-neutral-900/50",
+        link: "bg-transparent border-transparent text-emerald-300 underline underline-offset-4 hover:text-emerald-200",
       },
     },
     defaultVariants: {
