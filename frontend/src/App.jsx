@@ -37,16 +37,16 @@ function HistoryDots({ checks }) {
   );
 }
 
-function LatencyChart({ checks, height = 92 }) {
+function LatencyChart({ checks, height = 128 }) {
   // checks come newest-first; we want oldest->newest for a left-to-right chart
   const pts = (checks || [])
-    .slice(0, 60)
+    .slice(0, 120)
     .filter((c) => c.latency_ms != null)
     .slice()
     .reverse();
 
   const width = 560;
-  const pad = 10;
+  const pad = 12;
 
   const values = pts.map((c) => Number(c.latency_ms || 0));
   const max = Math.max(50, ...values);
@@ -61,6 +61,8 @@ function LatencyChart({ checks, height = 92 }) {
     return pad + (1 - t) * (height - pad * 2);
   };
 
+  const baseY = height - pad;
+
   const segments = [];
   for (let i = 0; i < pts.length; i++) {
     const ok = pts[i].ok === 1;
@@ -69,7 +71,7 @@ function LatencyChart({ checks, height = 92 }) {
     else last.end = i;
   }
 
-  function pathForRange(a, b) {
+  function linePathForRange(a, b) {
     // Include one-point overlap with previous segment so the line looks continuous.
     const start = Math.max(0, a - 1);
     return pts
@@ -83,13 +85,28 @@ function LatencyChart({ checks, height = 92 }) {
       .join(" ");
   }
 
-  const last = pts[pts.length - 1];
-  const lastMs = last?.latency_ms;
+  function areaPathForRange(a, b) {
+    const start = Math.max(0, a - 1);
+    const slice = pts.slice(start, b + 1);
+    if (!slice.length) return "";
+
+    const top = slice
+      .map((c, idx) => {
+        const i = start + idx;
+        const x = toX(i);
+        const y = toY(Number(c.latency_ms || 0));
+        return `${idx === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+      })
+      .join(" ");
+
+    const endX = toX(start + slice.length - 1);
+    const startX = toX(start);
+    return `${top} L ${endX.toFixed(2)} ${baseY.toFixed(2)} L ${startX.toFixed(2)} ${baseY.toFixed(2)} Z`;
+  }
 
   const fmtTime = (iso) => {
     try {
       const d = new Date(iso);
-      // HH:MM in local time
       return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     } catch {
       return "";
@@ -101,46 +118,53 @@ function LatencyChart({ checks, height = 92 }) {
   const lastLabel = pts.length ? fmtTime(pts[pts.length - 1].ts) : "";
 
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3">
-      <div className="flex items-baseline justify-between">
-        <div>
-          <div className="text-xs font-medium text-neutral-200">Response time</div>
-          <div className="text-[11px] text-neutral-500">X-axis: timestamps (recent {Math.min(pts.length, 60)} checks)</div>
-        </div>
-        <div className="text-xs text-neutral-400">{lastMs != null ? `${lastMs}ms` : "—"}</div>
+    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-medium text-neutral-200">Response time</div>
+        <div className="text-[11px] text-neutral-500">Recent</div>
       </div>
 
       {pts.length < 2 ? (
         <div className="mt-3 text-xs text-neutral-500">Not enough data yet.</div>
       ) : (
-        <div className="mt-3">
+        <div className="mt-2">
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="block h-[92px] w-full"
+            className="block h-[140px] w-full"
             preserveAspectRatio="none"
             role="img"
-            aria-label="Response time line chart"
+            aria-label="Response time chart"
           >
-            {/* solid stroke */}
+            {/* subtle grid */}
+            <line x1={pad} y1={baseY} x2={width - pad} y2={baseY} stroke="#262626" strokeWidth="1" />
+            <line x1={pad} y1={pad} x2={width - pad} y2={pad} stroke="#1f1f1f" strokeWidth="1" />
 
             {/* Y-axis labels */}
             <text x={pad} y={pad + 2} fill="#737373" fontSize="10" textAnchor="start">
               {max}ms
             </text>
-            <text x={pad} y={height - pad} fill="#737373" fontSize="10" textAnchor="start" dominantBaseline="ideographic">
+            <text x={pad} y={baseY} fill="#737373" fontSize="10" textAnchor="start" dominantBaseline="ideographic">
               0ms
             </text>
+            <text x={pad} y={(pad + baseY) / 2} fill="#525252" fontSize="10" textAnchor="start" dominantBaseline="middle">
+              Resp. Time (ms)
+            </text>
 
-            {/* baseline */}
-            <line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} stroke="#262626" strokeWidth="1" />
+            {/* area + line segments */}
             {segments.map((s) => (
-              <path
-                key={`${s.ok ? "up" : "down"}-${s.start}-${s.end}`}
-                d={pathForRange(s.start, s.end)}
-                fill="none"
-                stroke={s.ok ? "#22c55e" : "#ef4444"}
-                strokeWidth="2"
-              />
+              <g key={`${s.ok ? "up" : "down"}-${s.start}-${s.end}`}> 
+                <path
+                  d={areaPathForRange(s.start, s.end)}
+                  fill={s.ok ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)"}
+                  stroke="none"
+                />
+                <path
+                  d={linePathForRange(s.start, s.end)}
+                  fill="none"
+                  stroke={s.ok ? "#22c55e" : "#ef4444"}
+                  strokeWidth="2"
+                />
+              </g>
             ))}
           </svg>
         </div>
@@ -153,6 +177,69 @@ function LatencyChart({ checks, height = 92 }) {
           <span>{lastLabel}</span>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function StatRow({ label, sublabel, value }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <div className="min-w-0">
+        <div className="truncate text-sm font-medium text-neutral-200">{label}</div>
+        {sublabel ? <div className="text-xs text-neutral-500">{sublabel}</div> : null}
+      </div>
+      <div className="shrink-0 text-sm font-semibold text-neutral-100 tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function MonitorStats({ checks }) {
+  const stats = useMemo(() => {
+    const rows = checks || [];
+    const last = rows[0] || null;
+    // eslint-disable-next-line react-hooks/purity
+    const now = Date.now();
+
+    function inWindow(ms) {
+      return rows.filter((c) => {
+        const t = new Date(c.ts).getTime();
+        return Number.isFinite(t) && now - t <= ms;
+      });
+    }
+
+    function avgLatency(list) {
+      const xs = list.filter((c) => c.latency_ms != null).map((c) => Number(c.latency_ms));
+      if (!xs.length) return null;
+      return Math.round(xs.reduce((a, b) => a + b, 0) / xs.length);
+    }
+
+    function uptimePct(list) {
+      if (!list.length) return null;
+      const ok = list.filter((c) => c.ok === 1).length;
+      return (ok / list.length) * 100;
+    }
+
+    const w24 = inWindow(24 * 60 * 60 * 1000);
+    const w30d = inWindow(30 * 24 * 60 * 60 * 1000);
+
+    return {
+      currentMs: last?.latency_ms != null ? Number(last.latency_ms) : null,
+      avg24: avgLatency(w24),
+      up24: uptimePct(w24),
+      up30: uptimePct(w30d)
+    };
+  }, [checks]);
+
+  const fmtPct = (v) => (v == null ? "—" : `${v.toFixed(1)}%`);
+
+  return (
+    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
+      <div className="grid gap-4">
+        <StatRow label="Response" sublabel="(Current)" value={stats.currentMs != null ? `${stats.currentMs} ms` : "—"} />
+        <StatRow label="Avg. Response" sublabel="(24-hour)" value={stats.avg24 != null ? `${stats.avg24} ms` : "—"} />
+        <StatRow label="Uptime" sublabel="(24-hour)" value={fmtPct(stats.up24)} />
+        <StatRow label="Uptime" sublabel="(30-day)" value={fmtPct(stats.up30)} />
+      </div>
     </div>
   );
 }
@@ -185,12 +272,12 @@ export default function App() {
     refresh();
     const t = setInterval(refresh, 5000);
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!selected) return;
-    getChecks(selected.id, 90)
+    // pull more so we can compute 24h + 30d stats
+    getChecks(selected.id, 500)
       .then((d) => setChecks(d.checks || []))
       .catch(() => setChecks([]));
   }, [selected]);
@@ -376,9 +463,10 @@ export default function App() {
 
             {selectedMonitor ? (
               <div className="mt-4 space-y-3">
+                <MonitorStats checks={checks} />
                 <LatencyChart checks={checks} />
 
-                <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
+                <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-sm font-medium">{selectedMonitor.name}</div>
