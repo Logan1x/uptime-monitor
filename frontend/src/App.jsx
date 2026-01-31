@@ -249,7 +249,7 @@ function MonitorStats({ checks }) {
 
 function LogsModal({ open, onClose, pm2Name }) {
   const [tab, setTab] = useState("out");
-  const [lines, setLines] = useState(1000);
+  const [lines, setLines] = useState(200);
   const [auto, setAuto] = useState(true);
   const [data, setData] = useState({ out: [], err: [] });
   const [loading, setLoading] = useState(false);
@@ -491,29 +491,31 @@ function LogsModal({ open, onClose, pm2Name }) {
                   return (
                     <div key={row.key} className="rounded-xl border border-neutral-900/60 bg-neutral-950/20">
                       <button
-                        className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left"
+                        className="w-full rounded-xl px-3 py-2 text-left"
                         onClick={() => setExpandedKey(expanded ? "" : row.key)}
                         title="Click to toggle raw JSON"
                       >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-neutral-500 tabular-nums">{fmtTs(ts) || ""}</span>
-                            <span className="truncate font-mono text-[12px] text-neutral-100">{endpoint}</span>
-                          </div>
-                        </div>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] text-neutral-500 tabular-nums">{fmtTs(ts) || ""}</span>
+                              <span className="truncate font-mono text-[12px] text-neutral-100">{endpoint}</span>
+                            </div>
 
-                        <div className="flex shrink-0 items-center gap-2">
-                          <span className="rounded-md border border-neutral-800 bg-neutral-900 px-2 py-0.5 text-[11px] text-neutral-300 tabular-nums">
-                            {rtMs}
-                          </span>
-                          <span
-                            className={clsx(
-                              "rounded-md border px-2 py-0.5 text-[11px] font-medium tabular-nums",
-                              statusTone(status)
-                            )}
-                          >
-                            {status ?? "—"}
-                          </span>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <span
+                                className={clsx(
+                                  "rounded-md border px-2 py-0.5 text-[11px] font-medium tabular-nums",
+                                  statusTone(status)
+                                )}
+                              >
+                                {status ?? "—"}
+                              </span>
+                              <span className="rounded-md border border-neutral-800 bg-neutral-900 px-2 py-0.5 text-[11px] text-neutral-300 tabular-nums">
+                                {rtMs}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </button>
 
