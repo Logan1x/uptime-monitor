@@ -375,7 +375,7 @@ function LogsModal({ open, onClose, pm2Name }) {
       row.msg = obj.msg ?? row.msg;
     }
 
-    // Build display rows in original-ish order, but one line per reqId
+    // Build display rows one line per reqId
     const merged = [];
     const seen = new Set();
     for (const id of order) {
@@ -386,8 +386,15 @@ function LogsModal({ open, onClose, pm2Name }) {
       merged.push({ kind: "req", key: `${tab}:req:${id}`, req: r });
     }
 
+    // Newest-first: show latest requests at the top
+    merged.sort((a, b) => {
+      const ta = a.req?.doneTime ?? a.req?.inTime ?? 0;
+      const tb = b.req?.doneTime ?? b.req?.inTime ?? 0;
+      return Number(tb) - Number(ta);
+    });
+
     // Prefer merged rows; if there are lots of non-json lines, include them too.
-    return merged.length ? merged : out;
+    return merged.length ? merged : out.slice().reverse();
   }, [active, tab]);
 
   useEffect(() => {
@@ -395,10 +402,10 @@ function LogsModal({ open, onClose, pm2Name }) {
     if (!auto) return;
     const el = scrollRef.current;
     if (!el) return;
-    // next tick so the DOM has rendered
+    // With newest-first ordering, keep viewport pinned to top.
     const t = setTimeout(() => {
       try {
-        el.scrollTop = el.scrollHeight;
+        el.scrollTop = 0;
       } catch {
         // ignore
       }
