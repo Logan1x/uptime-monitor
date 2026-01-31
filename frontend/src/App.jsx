@@ -383,6 +383,7 @@ export default function App() {
   const [logsOpen, setLogsOpen] = useState(false);
   const [logsPm2Name, setLogsPm2Name] = useState("");
 
+  const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [interval, setIntervalSec] = useState(60);
@@ -419,8 +420,7 @@ export default function App() {
     return monitors.find((m) => m.id === selected.id) || null;
   }, [selected, monitors]);
 
-  async function onAdd(e) {
-    e.preventDefault();
+  async function createMonitor() {
     setLoading(true);
     setErr("");
     try {
@@ -428,6 +428,7 @@ export default function App() {
       setName("");
       setUrl("");
       setIntervalSec(60);
+      setAddOpen(false);
       await refresh();
     } catch (e) {
       setErr(e.message || String(e));
@@ -457,42 +458,45 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
-      <LogsModal
-        open={logsOpen}
-        onClose={() => setLogsOpen(false)}
-        pm2Name={logsPm2Name}
-      />
-      <div className="mx-auto max-w-6xl px-4 py-6">
-        <header className="flex items-end justify-between gap-4">
-          <div>
-            <div className="text-xs text-neutral-400">uptime-monitor</div>
-            <h1 className="text-2xl font-semibold tracking-tight">Monitors</h1>
-            <p className="mt-1 text-sm text-neutral-400">
-              Minimal: 60s checks, green/red history, add via API.
-            </p>
-          </div>
-          <button
-            className="inline-flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm hover:bg-neutral-800"
-            onClick={refresh}
-            disabled={loading}
-          >
-            <RefreshCw size={16} />
-            Refresh
-          </button>
-        </header>
+      <LogsModal open={logsOpen} onClose={() => setLogsOpen(false)} pm2Name={logsPm2Name} />
 
-        <main className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-[360px_1fr]">
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-            <div className="text-sm font-medium">Add monitor</div>
-            <form className="mt-3 space-y-3" onSubmit={onAdd}>
+      {/* Add Monitor Modal */}
+      {addOpen ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" onMouseDown={() => setAddOpen(false)}>
+          <div
+            className="w-full max-w-lg rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
+              <div>
+                <div className="text-sm font-semibold text-neutral-100">Add monitor</div>
+                <div className="text-xs text-neutral-500">Create a new HTTP monitor</div>
+              </div>
+              <button
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800"
+                onClick={() => setAddOpen(false)}
+                title="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form
+              className="grid gap-3 p-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                createMonitor();
+              }}
+            >
               <div className="grid gap-2">
                 <label className="text-xs text-neutral-400">Name</label>
                 <input
                   className="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm outline-none focus:border-neutral-600"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Bookmark Backend"
+                  placeholder="Bookmarks Backend"
                   required
+                  autoFocus
                 />
               </div>
               <div className="grid gap-2">
@@ -516,22 +520,64 @@ export default function App() {
                   onChange={(e) => setIntervalSec(e.target.value)}
                 />
               </div>
-              <button
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-emerald-400 disabled:opacity-60"
-                disabled={loading}
-              >
-                <Plus size={16} />
-                Add
-              </button>
-            </form>
 
-            {err ? (
-              <div className="mt-3 rounded-lg border border-rose-900/40 bg-rose-950/30 px-3 py-2 text-sm text-rose-200">
-                {err}
+              {err ? (
+                <div className="rounded-lg border border-rose-900/40 bg-rose-950/30 px-3 py-2 text-sm text-rose-200">
+                  {err}
+                </div>
+              ) : null}
+
+              <div className="mt-1 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800"
+                  onClick={() => setAddOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-emerald-400 disabled:opacity-60"
+                  disabled={loading}
+                  type="submit"
+                >
+                  <Plus size={16} />
+                  Add
+                </button>
               </div>
-            ) : null}
-          </section>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        <header className="flex items-end justify-between gap-4">
+          <div>
+            <div className="text-xs text-neutral-400">uptime-monitor</div>
+            <h1 className="text-2xl font-semibold tracking-tight">Monitors</h1>
+            <p className="mt-1 text-sm text-neutral-400">Minimal: checks, charts, pm2 logs.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="inline-flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm hover:bg-neutral-800"
+              onClick={() => setAddOpen(true)}
+              disabled={loading}
+              title="Add monitor"
+            >
+              <Plus size={16} />
+              Add
+            </button>
+            <button
+              className="inline-flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm hover:bg-neutral-800"
+              onClick={refresh}
+              disabled={loading}
+            >
+              <RefreshCw size={16} />
+              Refresh
+            </button>
+          </div>
+        </header>
+
+        <main className="mt-6">
           <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium">Monitors</div>
