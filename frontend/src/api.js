@@ -5,11 +5,12 @@ function apiBase() {
 
   const mode = String(import.meta?.env?.MODE || "").toLowerCase();
   if (mode === "production") {
-    // In prod we expect same-origin proxying (API served under /api) unless VITE_API_BASE is set.
+    // In prod we default to same-host backend on port 4070.
+    // (This avoids needing a reverse proxy in simple self-host setups.)
     try {
-      return window.location.origin;
+      return `http://${window.location.hostname}:4070`;
     } catch {
-      return "";
+      return "http://127.0.0.1:4070";
     }
   }
 

@@ -13,3 +13,7 @@
 
 # Logs
 **/*.log
+
+# Local tooling
+.رالphy/
+.ralphy/

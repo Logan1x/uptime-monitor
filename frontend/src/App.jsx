@@ -1,10 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, RefreshCw, Trash2, Terminal, X } from "lucide-react";
+import { Link, Plus, RefreshCw, Trash2, Terminal, X } from "lucide-react";
 import { addMonitor, deleteMonitor, getCapabilities, getChecks, getPm2Logs, listMonitors } from "./api";
 import { Badge } from "@/components/ui/badge";
 
+const PUBLIC_HOST = "192.168.31.176";
+
 function clsx(...xs) {
   return xs.filter(Boolean).join(" ");
+}
+
+function urlForOpening(rawUrl) {
+  try {
+    const u = new URL(String(rawUrl));
+    // Replace localhost-ish hostnames so the link works from other devices on the LAN.
+    if (["localhost", "127.0.0.1", "0.0.0.0"].includes(u.hostname)) {
+      u.hostname = PUBLIC_HOST;
+    }
+    return u.toString();
+  } catch {
+    return String(rawUrl || "");
+  }
 }
 
 function StatusPip({ ok }) {
@@ -765,7 +780,7 @@ export default function App() {
       <div className="mx-auto max-w-6xl px-4 py-6">
         <header className="flex items-end justify-between gap-4">
           <div>
-            <div className="text-xs text-neutral-400">uptime-monitor</div>
+            <div className="text-xs text-neutral-400">moni8</div>
             <h1 className="text-2xl font-semibold tracking-tight">Monitors</h1>
             <p className="mt-1 text-sm text-neutral-400">Minimal: checks, charts, pm2 logs.</p>
           </div>
@@ -790,7 +805,8 @@ export default function App() {
           </div>
         </header>
 
-        <main className="mt-6">
+        <main className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-[360px_1fr]">
+          {/* Left: monitor list */}
           <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium">Monitors</div>
@@ -824,15 +840,26 @@ export default function App() {
                         <div className="mt-1 truncate text-xs text-neutral-500">{m.url}</div>
                         <div className="mt-2 flex items-center gap-3 text-xs text-neutral-500">
                           <span>{m.interval_sec}s</span>
-                          {m.lastCheck?.latency_ms != null ? (
-                            <span>{m.lastCheck.latency_ms}ms</span>
-                          ) : null}
-                          {m.lastCheck?.status_code != null ? (
-                            <span>HTTP {m.lastCheck.status_code}</span>
-                          ) : null}
+                          {m.lastCheck?.latency_ms != null ? <span>{m.lastCheck.latency_ms}ms</span> : null}
+                          {m.lastCheck?.status_code != null ? <span>HTTP {m.lastCheck.status_code}</span> : null}
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const openUrl = urlForOpening(m.url);
+                            if (openUrl) window.open(openUrl, "_blank", "noopener,noreferrer");
+                          }}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-neutral-400 hover:border-neutral-700 hover:bg-neutral-900 hover:text-neutral-200"
+                          title={`Open: ${urlForOpening(m.url)}`}
+                        >
+                          <Link size={16} />
+                        </div>
+
                         {caps.pm2Logs && m.pm2_name ? (
                           <div
                             role="button"
@@ -875,31 +902,57 @@ export default function App() {
                 </div>
               ) : null}
             </div>
+          </section>
 
+          {/* Right: details */}
+          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
             {selectedMonitor ? (
-              <div className="mt-4 space-y-3">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-neutral-100">{selectedMonitor.name}</div>
+                    <div className="mt-1 truncate text-xs text-neutral-500">{selectedMonitor.url}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800"
+                      onClick={() => {
+                        const openUrl = urlForOpening(selectedMonitor.url);
+                        if (openUrl) window.open(openUrl, "_blank", "noopener,noreferrer");
+                      }}
+                      title={`Open: ${urlForOpening(selectedMonitor.url)}`}
+                    >
+                      <Link size={16} />
+                    </button>
+                    <div className="text-xs text-neutral-500">id: {selectedMonitor.id}</div>
+                  </div>
+                </div>
+
                 <MonitorStats checks={checks} />
                 <LatencyChart checks={checks} />
 
                 <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-medium">{selectedMonitor.name}</div>
-                      <div className="text-xs text-neutral-500">Recent checks</div>
+                      <div className="text-sm font-medium">Recent checks</div>
+                      <div className="text-xs text-neutral-500">Last 30</div>
                     </div>
-                    <div className="text-xs text-neutral-500">Last 30</div>
                   </div>
                   <div className="mt-3">
                     <HistoryDots checks={checks} />
                   </div>
                 </div>
               </div>
-            ) : null}
+            ) : (
+              <div className="flex h-full min-h-[240px] items-center justify-center rounded-xl border border-dashed border-neutral-800 bg-neutral-950/20 p-6 text-center text-sm text-neutral-500">
+                Select a monitor to see details.
+              </div>
+            )}
           </section>
         </main>
 
         <footer className="mt-6 text-xs text-neutral-600">
-          API: GET /api/monitors, POST /api/monitors, DELETE /api/monitors/:id
+          moni8 • API: GET /api/monitors, POST /api/monitors, DELETE /api/monitors/:id
         </footer>
       </div>
     </div>
